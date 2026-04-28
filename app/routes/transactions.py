@@ -128,3 +128,48 @@ async def get_summary(
         "total_expense": total_expense,
         "balance": total_income - total_expense
     }
+
+@router.put("/{transaction_id}", response_model=TransactionResponse)
+async def update_transaction(
+    transaction_id: int,
+    transaction: TransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(AuthService.get_current_user)
+):
+    existing_transaction = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.user_id == current_user.id
+    ).first()
+
+    if not existing_transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    existing_transaction.amount = transaction.amount
+    existing_transaction.description = transaction.description
+    existing_transaction.category = transaction.category
+    existing_transaction.transaction_type = transaction.transaction_type.upper()
+
+    db.commit()
+    db.refresh(existing_transaction)
+
+    return existing_transaction
+
+
+@router.delete("/{transaction_id}")
+async def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(AuthService.get_current_user)
+):
+    existing_transaction = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.user_id == current_user.id
+    ).first()
+
+    if not existing_transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    db.delete(existing_transaction)
+    db.commit()
+
+    return {"message": "Transaction deleted successfully"}

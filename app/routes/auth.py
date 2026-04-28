@@ -17,7 +17,7 @@ class UserCreate(BaseModel):
     @classmethod
     def validate_username(cls, v):
         if len(v) < 3:
-            raise ValueError("Username too short")
+            raise ValueError("Username must be at least 3 characters")
         return v
 
     @field_validator("email")
@@ -27,14 +27,34 @@ class UserCreate(BaseModel):
             raise ValueError("Invalid email")
         return v
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+
+        if not any(c.isupper() for c in v):
+            raise ValueError("Password must contain at least one uppercase letter")
+
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Password must contain at least one number")
+
+        if not any(not c.isalnum() for c in v):
+            raise ValueError("Password must contain at least one special character")
+
+        return v
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    role: str
+    username: str
+    email: str
 
 class UserResponse(BaseModel):
     id: int
     username: str
     email: str
+    role: str
     model_config = ConfigDict(from_attributes=True)
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -85,7 +105,12 @@ async def login(
         )
 
     token = AuthService().create_access_token({"sub": user.username})
-    return TokenResponse(access_token=token)
+    return TokenResponse(
+    access_token=token,
+    role=user.role,
+    username=user.username,
+    email=user.email
+)
 
 @router.get("/me", response_model=UserResponse)
 async def me(current_user: User = Depends(AuthService.get_current_user)):
